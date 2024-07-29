@@ -1,0 +1,59 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+
+class NFTStudio:
+    def __init__(self):
+        self.api_url = 'https://api.opensea.io/api/v1/'
+
+    def get_nft_metadata(self, asset_contract_address: str, token_id: str) -> dict:
+        url = f"{self.api_url}asset/{asset_contract_address}/{token_id}/"
+        response = requests.get(url)
+        data = response.json()
+        return data
+
+    def get_nft_transactions(self, asset_contract_address: str, token_id: str) -> pd.DataFrame:
+        url = f"{self.api_url}events"
+        params = {
+            'asset_contract_address': asset_contract_address,
+            'token_id': token_id,
+            'event_type': 'successful'
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        if 'asset_events' in data:
+            df = pd.DataFrame(data['asset_events'])
+            df['event_timestamp'] = pd.to_datetime(df['event_timestamp'])
+            df['total_price'] = df['total_price'].astype(float) / (10 ** 18)  # Adjust for ETH decimals
+            return df
+        else:
+            return pd.DataFrame()
+
+    def plot_nft_transactions(self, asset_contract_address: str, token_id: str):
+        df = self.get_nft_transactions(asset_contract_address, token_id)
+        if df.empty:
+            print("No transaction data found.")
+            return
+
+        df.set_index('event_timestamp', inplace=True)
+        plt.figure(figsize=(12, 6))
+        plt.plot(df.index, df['total_price'], marker='o', linestyle='-')
+        plt.title(f'Transaction History for NFT {token_id}')
+        plt.xlabel('Date')
+        plt.ylabel('Price (ETH)')
+        plt.grid(True)
+        plt.show()
+
+# Example Usage
+if __name__ == "__main__":
+    nft_studio = NFTStudio()
+
+    # Fetch and Display NFT Metadata
+    asset_contract_address = '0xYourNFTContractAddress'  # Replace with the NFT contract address
+    token_id = '1'  # Replace with the NFT token ID
+    metadata = nft_studio.get_nft_metadata(asset_contract_address, token_id)
+    print("NFT Metadata:")
+    print(metadata)
+
+    # Plot NFT Transactions
+    nft_studio.plot_nft_transactions(asset_contract_address, token_id)
